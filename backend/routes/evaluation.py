@@ -1,4 +1,4 @@
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends
 
 from backend.evaluation_cases import evaluation_cases
 from backend.agents.pipeline import process_ticket

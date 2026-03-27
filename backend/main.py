@@ -17,11 +17,11 @@ app.add_middleware(
 # Initialize DB
 init_db()
 
-# Routers
-app.include_router(auth.router, prefix="/auth", tags=["auth"])
-app.include_router(policy.router, prefix="/policy", tags=["policy"])
-app.include_router(ticket.router, prefix="/ticket", tags=["ticket"])
-app.include_router(evaluation.router, prefix="/evaluation", tags=["evaluation"])
+# Routers (prefixed with /api for Vercel/Production)
+app.include_router(auth.router, prefix="/api/auth", tags=["auth"])
+app.include_router(policy.router, prefix="/api/policy", tags=["policy"])
+app.include_router(ticket.router, prefix="/api/ticket", tags=["ticket"])
+app.include_router(evaluation.router, prefix="/api/evaluation", tags=["evaluation"])
 
 @app.get("/")
 def root():
