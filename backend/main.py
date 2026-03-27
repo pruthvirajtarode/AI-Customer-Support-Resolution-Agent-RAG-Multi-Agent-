@@ -2,8 +2,15 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from backend.database import init_db
 from backend.routes import auth, policy, ticket, evaluation
+from contextlib import asynccontextmanager
 
-app = FastAPI(title="SupportAI SaaS")
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Initialize DB
+    init_db()
+    yield
+
+app = FastAPI(title="SupportAI SaaS", lifespan=lifespan)
 
 # CORS setup
 app.add_middleware(
@@ -13,9 +20,6 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
-
-# Initialize DB
-init_db()
 
 # Routers (prefixed with /api for Vercel/Production)
 app.include_router(auth.router, prefix="/api/auth", tags=["auth"])
