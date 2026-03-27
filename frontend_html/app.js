@@ -10,7 +10,7 @@ window.addEventListener('DOMContentLoaded', () => {
     showPanel(location.hash || '#login');
 });
 
-const API_URL = 'http://localhost:8000';
+const API_URL = '/api'; // Use relative path for production on Vercel
 let token = localStorage.getItem('token') || '';
 
 // Login
