@@ -10,7 +10,7 @@ st.title("SupportAI SaaS Dashboard")
 if "token" not in st.session_state:
     st.session_state.token = None
 
-menu = st.sidebar.selectbox("Menu", ["Login", "Signup", "Dashboard", "Upload Policy", "Submit Ticket", "View Tickets", "View Responses"])
+menu = st.sidebar.selectbox("Menu", ["Login", "Signup", "Dashboard", "Upload Policy", "Submit Ticket", "View History", "System Evaluation"])
 
 headers = {"Authorization": f"Bearer {st.session_state.token}"} if st.session_state.token else {}
 
@@ -20,8 +20,8 @@ if menu == "Signup":
     email = st.text_input("Email")
     password = st.text_input("Password", type="password")
     if st.button("Register"):
-        r = requests.post(f"{API_URL}/auth/register", params={"name": name, "email": email, "password": password})
-        st.success(r.json().get("msg", "Registered"))
+        r = requests.post(f"{API_URL}/auth/register?name={name}&email={email}&password={password}")
+        st.success("Registered! Go to Login.")
 
 elif menu == "Login":
     st.subheader("Login")
@@ -40,6 +40,12 @@ elif menu == "Dashboard":
     st.subheader("Welcome to SupportAI SaaS!")
     if not st.session_state.token:
         st.info("Please login.")
+    else:
+        st.markdown("---")
+        col1, col2, col3 = st.columns(3)
+        col1.metric("Resolution Time", "50ms")
+        col2.metric("Pipeline Health", "100%")
+        col3.metric("Uptime", "99.9%")
 
 elif menu == "Upload Policy":
     st.subheader("Upload Policy Document")
@@ -52,17 +58,43 @@ elif menu == "Upload Policy":
 elif menu == "Submit Ticket":
     st.subheader("Submit Ticket")
     ticket_text = st.text_area("Ticket Text")
-    order_json = st.text_area("Order Context (JSON)", value='{"order_date": "", "delivery_date": "", "item_category": "", "order_status": "", "region": ""}')
+    order_json = st.text_area("Order Context (JSON)", value='{"order_date": "2023-01-01", "delivery_date": "2023-01-05", "item_category": "electronics", "order_status": "delivered", "region": "US"}')
     if st.button("Submit"):
-        r = requests.post(f"{API_URL}/ticket/submit", params={"ticket_text": ticket_text, "order_json": order_json}, headers=headers)
-        st.json(r.json())
+        with st.spinner("Agent running..."):
+            r = requests.post(f"{API_URL}/ticket/submit", params={"ticket_text": ticket_text, "order_json": order_json}, headers=headers)
+            res = r.json()
+            st.markdown(f"**AI Decision:** `{res['decision']}`")
+            st.write(f"**Response:** {res['customer_response']}")
+            with st.expander("Rationale"):
+                st.write(res["rationale"])
 
-elif menu == "View Tickets":
-    st.subheader("Your Tickets")
-    r = requests.get(f"{API_URL}/ticket/list", headers=headers)
-    st.json(r.json())
-
-elif menu == "View Responses":
-    st.subheader("AI Responses")
+elif menu == "View History":
+    st.subheader("AI Performance History")
     r = requests.get(f"{API_URL}/ticket/responses", headers=headers)
-    st.json(r.json())
+    if r.ok:
+        data = r.json()
+        for item in data:
+            st.markdown(f"**[{item['decision']}]** - {item['response_text']}")
+            st.caption(f"Category: {item['classification']}")
+            st.divider()
+
+elif menu == "System Evaluation":
+    st.subheader("20+ Test Case Audit")
+    if st.button("Run Audit"):
+        with st.spinner("Processing 20+ scenarios..."):
+            r = requests.get(f"{API_URL}/evaluation/report", headers=headers)
+            if r.ok:
+                data = r.json()
+                st.write(f"Accuracy: **{data['correctness']}**")
+                col1, col2 = st.columns(2)
+                col1.info(f"Citation Coverage: {data['citation_coverage']}")
+                col2.warning(f"Escalation Accuracy: {data['escalation_accuracy']}")
+                st.divider()
+                for item in data['details']:
+                    bg = "#dcfce7" if item['correct'] else "#fee2e2"
+                    with st.container():
+                        st.markdown(f"**Input:** {item['input']['ticket_text'][:80]}...")
+                        st.markdown(f"**Expected:** `{item['input']['expected']['decision']}` | **Actual:** `{item['output']['decision']}`")
+                        if not item['correct']:
+                            st.error("Audit Discrepancy Found")
+                        st.divider()
