@@ -15,12 +15,21 @@ def submit_ticket(ticket_text: str, order_json: str, db: Session = Depends(get_d
     db.add(ticket)
     db.commit()
     db.refresh(ticket)
+    
     # AI pipeline
     ai_result = process_ticket(ticket, user.id)
-    ai_response = AIResponse(ticket_id=ticket.id, **ai_result)
+    
+    # Map agent results to AIResponse model
+    ai_response = AIResponse(
+        ticket_id=ticket.id,
+        classification=ai_result["classification"],
+        decision=ai_result["decision"],
+        rationale=ai_result.get("rationale", ""),
+        response_text=ai_result.get("customer_response", ""),
+        citations=json.dumps(ai_result.get("citations", []))
+    )
     db.add(ai_response)
     db.commit()
-    db.refresh(ai_response)
     return ai_result
 
 @router.get("/list")
