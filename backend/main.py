@@ -2,18 +2,15 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from backend.database import init_db
 from backend.routes import auth, policy, ticket, evaluation
-from contextlib import asynccontextmanager
+
 
 from fastapi.staticfiles import StaticFiles
 import os
 
-@asynccontextmanager
-async def lifespan(app: FastAPI):
-    # Initialize DB
-    init_db()
-    yield
+# Initialize DB synchronously for serverless compatibility
+init_db()
 
-app = FastAPI(title="SupportAI SaaS", lifespan=lifespan)
+app = FastAPI(title="SupportAI SaaS")
 
 # Routers (prefixed with /api for Consistency)
 app.include_router(auth.router, prefix="/api/auth", tags=["auth"])
