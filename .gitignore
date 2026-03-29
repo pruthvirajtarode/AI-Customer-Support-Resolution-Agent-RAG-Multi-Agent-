@@ -1,0 +1,17 @@
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.env
+.venv
+env/
+venv/
+supportai.db
+faiss_index/
+.DS_Store
+.vscode/
+.idea/
+node_modules/
+dist/
+build/
+*.log

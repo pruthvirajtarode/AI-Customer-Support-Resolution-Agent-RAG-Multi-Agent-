@@ -1,6 +1,10 @@
 import os
-from langchain.chat_models import ChatOpenAI
-from langchain.schema import SystemMessage, HumanMessage
+try:
+    from langchain_openai import ChatOpenAI
+    from langchain_core.messages import SystemMessage, HumanMessage
+except ImportError:
+    from langchain_community.chat_models import ChatOpenAI
+    from langchain_core.messages import SystemMessage, HumanMessage
 
 def compliance_agent(resolution, retrieved):
     evidence = " ".join([r["text"] for r in retrieved])
@@ -13,7 +17,7 @@ def compliance_agent(resolution, retrieved):
                 SystemMessage(content="You are a Compliance Agent. Verify if the resolution is grounded in the retrieved evidence. If it is not grounded, return 'False'. Otherwise return 'True'."),
                 HumanMessage(content=f"Evidence: {evidence}\n\nResolution: {resolution['rationale']}")
             ]
-            res = chat(messages).content
+            res = chat.invoke(messages).content
             if "false" in res.lower():
                 return {"valid": False, "reason": "AI detected potential hallucination or lack of grounding."}
         except Exception:

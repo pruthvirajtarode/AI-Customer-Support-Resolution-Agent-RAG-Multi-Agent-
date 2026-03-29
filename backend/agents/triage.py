@@ -1,7 +1,11 @@
 import re
 import os
-from langchain.chat_models import ChatOpenAI
-from langchain.schema import SystemMessage, HumanMessage
+try:
+    from langchain_openai import ChatOpenAI
+    from langchain_core.messages import SystemMessage, HumanMessage
+except ImportError:
+    from langchain_community.chat_models import ChatOpenAI
+    from langchain_core.messages import SystemMessage, HumanMessage
 
 def triage_agent(ticket_text):
     api_key = os.getenv("OPENAI_API_KEY")
@@ -12,7 +16,8 @@ def triage_agent(ticket_text):
                 SystemMessage(content="You are a Triage Agent. Classify the customer ticket into: refund, shipping, cancellation, fraud, or other. Also identify missing information like order_id or date."),
                 HumanMessage(content=ticket_text)
             ]
-            res = chat(messages).content
+            res = chat.invoke(messages).content
+            
             # Simple parsing for placeholder logic compatibility
             classification = "other"
             for cat in ["refund", "shipping", "cancellation", "fraud"]:

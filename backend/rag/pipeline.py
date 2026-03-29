@@ -1,19 +1,24 @@
 import os
-from langchain.text_splitter import RecursiveCharacterTextSplitter
-from langchain.embeddings import OpenAIEmbeddings, HuggingFaceEmbeddings
+import tempfile
+from langchain_text_splitters import RecursiveCharacterTextSplitter
 try:
-    from langchain.vectorstores import FAISS
+    from langchain_openai import OpenAIEmbeddings
+    from langchain_huggingface import HuggingFaceEmbeddings
+except ImportError:
+    from langchain_community.embeddings import OpenAIEmbeddings, HuggingFaceEmbeddings
+try:
+    from langchain_community.vectorstores import FAISS
 except ImportError:
     FAISS = None
 import pickle
 
 EMBEDDING_MODEL = os.getenv("EMBEDDING_MODEL", "openai")
 
-VECTOR_DB_PATH = "/tmp/faiss_index/"
+VECTOR_DB_PATH = os.path.join(tempfile.gettempdir(), "faiss_index")
 os.makedirs(VECTOR_DB_PATH, exist_ok=True)
 
 def get_embeddings():
-    if EMBEDDING_MODEL == "openai":
+    if EMBEDDING_MODEL == "openai" or not EMBEDDING_MODEL:
         return OpenAIEmbeddings()
     else:
         return HuggingFaceEmbeddings(model_name="all-MiniLM-L6-v2")

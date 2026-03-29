@@ -1,6 +1,10 @@
 import os
-from langchain.chat_models import ChatOpenAI
-from langchain.schema import SystemMessage, HumanMessage
+try:
+    from langchain_openai import ChatOpenAI
+    from langchain_core.messages import SystemMessage, HumanMessage
+except ImportError:
+    from langchain_community.chat_models import ChatOpenAI
+    from langchain_core.messages import SystemMessage, HumanMessage
 
 def resolution_agent(ticket_text, retrieved):
     evidence = "\n".join([r["text"] for r in retrieved])
@@ -16,7 +20,7 @@ def resolution_agent(ticket_text, retrieved):
                 HumanMessage(content=f"Context: {evidence}\n\nTicket: {ticket_text}")
             ]
             # Simple simulation of result parsing
-            res = chat(messages).content
+            res = chat.invoke(messages).content
             return {
                 "classification": "refund" if "refund" in ticket_text.lower() else "other",
                 "decision": "approve" if "approve" in res.lower() else "deny" if "deny" in res.lower() else "escalate",

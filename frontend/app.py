@@ -2,7 +2,7 @@ import streamlit as st
 import requests
 import json
 
-API_URL = "http://localhost:8000"
+API_URL = "http://localhost:8000/api"
 
 st.set_page_config(page_title="SupportAI SaaS", layout="centered")
 st.title("SupportAI SaaS Dashboard")
