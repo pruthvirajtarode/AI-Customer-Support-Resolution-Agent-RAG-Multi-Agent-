@@ -17,6 +17,7 @@ def resolution_agent(ticket_text, retrieved, order_json="", initial_triage=None)
             "classification": classification,
             "decision": "escalate",
             "rationale": f"Missing information: {', '.join(initial_triage['missing_info'])}",
+            "explanation": f"I see you're asking about a {classification}. Could you please provide your {' and '.join(initial_triage['missing_info'])} so I can help you better?",
             "citations": [],
             "customer_response": f"I see you're asking about a {classification}. Could you please provide your {' and '.join(initial_triage['missing_info'])} so I can help you better?",
             "internal_notes": "Triage detected missing information."
@@ -37,6 +38,7 @@ def resolution_agent(ticket_text, retrieved, order_json="", initial_triage=None)
                 "classification": classification,
                 "decision": "approve" if "approve" in res.lower() else "deny" if "deny" in res.lower() else "escalate",
                 "rationale": res[:200],
+                "explanation": res,
                 "citations": citations,
                 "customer_response": res,
                 "internal_notes": "AI generated."
@@ -50,6 +52,7 @@ def resolution_agent(ticket_text, retrieved, order_json="", initial_triage=None)
             "classification": "other",
             "decision": "escalate",
             "rationale": "The current policy base does not contain information regarding this request.",
+            "explanation": "I'm sorry, I couldn't find specific instructions in our current policy documents regarding this request.",
             "citations": [],
             "customer_response": "I'm sorry, I couldn't find specific instructions in our current policy documents regarding this request. I have escalated this to a human specialist.",
             "internal_notes": "No grounding found."
@@ -90,6 +93,7 @@ def resolution_agent(ticket_text, retrieved, order_json="", initial_triage=None)
         "classification": classification,
         "decision": decision,
         "rationale": rationale,
+        "explanation": f"Based on our policy: {rationale}",
         "citations": citations,
         "customer_response": f"Based on our policy: {rationale}",
         "internal_notes": "Processed by SupportAI Pipeline."
