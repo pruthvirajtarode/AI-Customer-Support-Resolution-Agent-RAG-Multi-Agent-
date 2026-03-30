@@ -60,7 +60,7 @@ def resolution_agent(ticket_text, retrieved, order_json="", initial_triage=None)
 
     evidence_low = evidence.lower()
     ticket_low = ticket_text.lower()
-    order_low = order_json.lower()
+    order_low = str(order_json).lower()
     
     if "refund" in ticket_low or "return" in ticket_low:
         if "perishable" in evidence_low or "food" in evidence_low or "food" in order_low:
