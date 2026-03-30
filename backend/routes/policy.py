@@ -26,5 +26,5 @@ def upload_policy(file: UploadFile = File(...), db: Session = Depends(get_db), u
     db.commit()
     db.refresh(doc)
     # Process for RAG
-    process_policy_document(doc, user.id)
-    return {"msg": "Uploaded and processed"}
+    chunks_count = process_policy_document(doc, user.id)
+    return {"msg": "Uploaded and processed", "indexed_chunks": chunks_count}

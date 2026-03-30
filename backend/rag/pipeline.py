@@ -41,6 +41,7 @@ def process_policy_document(doc, user_id):
     index_path = os.path.join(VECTOR_DB_PATH, index_name)
     with open(index_path, "wb") as f:
         pickle.dump({"chunks": chunks, "metadatas": metadatas}, f)
+    return len(chunks)
 
 def load_user_faiss(user_id):
     index_name = f"simple_index_{user_id}.pkl"
