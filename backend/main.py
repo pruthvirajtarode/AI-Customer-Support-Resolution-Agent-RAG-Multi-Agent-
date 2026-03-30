@@ -43,26 +43,24 @@ from fastapi.responses import FileResponse, JSONResponse
 
 @app.get("/")
 def serve_ui():
-    # Root is the parent of the folder containing main.py
     root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-    # Try dist/ first (for Vite/Built apps) then public/ (static source)
-    for folder in ["dist", "public"]:
+    # Vercel bundled path is api/static
+    for folder in [os.path.join("api", "static"), "dist", "public"]:
         path = os.path.join(root, folder, "index.html")
         if os.path.exists(path):
             return FileResponse(path)
-    # Debug info if nothing is found
-    cwd = os.getcwd()
-    ls_root = os.listdir(root) if os.path.exists(root) else "Path Not Found"
-    return JSONResponse(content={
-        "detail": f"UI not found in dist/ or public/. ROOT={root}, CWD={cwd}, Files={ls_root}"
-    }, status_code=404)
+    return JSONResponse(content={"detail": "UI files not found in api/static. Deployment sync in progress."}, status_code=404)
 
 @app.get("/api")
 def api_root():
     return {"message": "SupportAI SaaS is running."}
 
 # Serve public static files at root
-frontend_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "public")
+root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+frontend_dir = os.path.join(root, "api", "static")
+if not os.path.exists(frontend_dir):
+    frontend_dir = os.path.join(root, "public") # Fallback
+
 if os.path.exists(frontend_dir):
     app.mount("/", StaticFiles(directory=frontend_dir, html=True), name="static")
 
