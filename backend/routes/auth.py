@@ -28,24 +28,39 @@ def create_access_token(data: dict, expires_delta: timedelta = None):
     to_encode.update({"exp": expire})
     return jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
 
-@router.post("/register")
-def register(name: str, email: str, password: str, db: Session = Depends(get_db)):
-    print(f"REGISTER DEBUG: {name=}, {email=}, password_len={len(password)}")
-    if db.query(User).filter(User.email == email).first():
+from pydantic import BaseModel
+
+class UserAuth(BaseModel):
+    email: str
+    password: str
+    full_name: str = None
+
+class LoginRequest(BaseModel):
+    email: str
+    password: str
+
+@router.post("/signup")
+def signup(data: UserAuth, db: Session = Depends(get_db)):
+    if db.query(User).filter(User.email == data.email).first():
         raise HTTPException(status_code=400, detail="Email already registered")
-    user = User(name=name, email=email, password_hash=get_password_hash(password))
+    user = User(name=data.full_name, email=data.email, password_hash=get_password_hash(data.password))
     db.add(user)
     db.commit()
     db.refresh(user)
-    return {"msg": "User registered"}
+    return {"msg": "User provisioned successfully"}
 
 @router.post("/login")
-def login(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(get_db)):
-    user = db.query(User).filter(User.email == form_data.username).first()
-    if not user or not verify_password(form_data.password, user.password_hash):
+def login(data: LoginRequest, db: Session = Depends(get_db)):
+    user = db.query(User).filter(User.email == data.email).first()
+    if not user or not verify_password(data.password, user.password_hash):
         raise HTTPException(status_code=401, detail="Invalid credentials")
+    
     access_token = create_access_token({"sub": user.email, "user_id": user.id})
-    return {"access_token": access_token, "token_type": "bearer"}
+    return {
+        "access_token": access_token, 
+        "token_type": "bearer",
+        "user": {"email": user.email, "full_name": user.name}
+    }
 
 # Dependency for protected routes
 def get_current_user(token: str = Depends(oauth2_scheme), db: Session = Depends(get_db)):
