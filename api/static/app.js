@@ -1,250 +1,274 @@
-// SPA navigation
-const panels = document.querySelectorAll('.panel');
-const navLinks = {
-    '#login': 'nav-login',
-    '#signup': 'nav-signup',
-    '#dashboard': 'nav-dashboard',
-    '#upload': 'nav-upload',
-    '#ticket': 'nav-ticket',
-    '#responses': 'nav-responses',
-    '#evaluation': 'nav-evaluation'
-};
+// State Management
+let token = localStorage.getItem('token');
+let currentUser = null;
 
-function showPanel(hash) {
-    hash = hash || '#login';
-    panels.forEach(p => p.classList.remove('active'));
-    document.querySelectorAll('nav li').forEach(li => li.style.opacity = '0.6');
-    
-    const panel = document.querySelector(hash);
-    if (panel) panel.classList.add('active');
-    
-    const navId = navLinks[hash];
-    if (navId) document.getElementById(navId).style.opacity = '1';
-}
-
-window.addEventListener('hashchange', () => showPanel(location.hash));
-
-const API_URL = '/api';
-let token = localStorage.getItem('token') || '';
-
-function updateDashboardUI() {
-    if (token) {
-        document.getElementById('nav-login').style.display = 'none';
-        document.getElementById('nav-signup').style.display = 'none';
-        document.getElementById('nav-dashboard').style.display = 'block';
-        document.getElementById('nav-upload').style.display = 'block';
-        document.getElementById('nav-ticket').style.display = 'block';
-        document.getElementById('nav-responses').style.display = 'block';
-        document.getElementById('nav-evaluation').style.display = 'block';
-    } else {
-        document.getElementById('nav-login').style.display = 'block';
-        document.getElementById('nav-signup').style.display = 'block';
-        document.getElementById('nav-dashboard').style.display = 'none';
-        document.getElementById('nav-upload').style.display = 'none';
-        document.getElementById('nav-ticket').style.display = 'none';
-        document.getElementById('nav-responses').style.display = 'none';
-        document.getElementById('nav-evaluation').style.display = 'none';
+// Initialize Lucide Icons
+function initIcons() {
+    if (window.lucide) {
+        window.lucide.createIcons();
     }
 }
 
-window.addEventListener('DOMContentLoaded', () => {
-    updateDashboardUI();
-    showPanel(location.hash);
-    if (window.lucide) lucide.createIcons();
+// Navigation Handling
+document.querySelectorAll('.nav-item').forEach(item => {
+    item.addEventListener('click', (e) => {
+        const targetId = item.getAttribute('data-target');
+        if (targetId) {
+            e.preventDefault();
+            showPanel(targetId);
+            
+            // Update Active State
+            document.querySelectorAll('.nav-item').forEach(i => i.classList.remove('active'));
+            item.classList.add('active');
+            
+            // Push state for browser back button
+            window.location.hash = targetId;
+        }
+    });
 });
 
-// Login
-const loginForm = document.getElementById('loginForm');
-if (loginForm) loginForm.onsubmit = async e => {
+function showPanel(panelId) {
+    document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+    const targetPanel = document.getElementById(panelId);
+    if (targetPanel) {
+        targetPanel.classList.add('active');
+    }
+    initIcons();
+}
+
+// Authentication UI Updates
+async function validateToken() {
+    if (!token) return updateAuthUI(null);
+    
+    try {
+        const res = await fetch('/api/auth/me', {
+            headers: { 'Authorization': `Bearer ${token}` }
+        });
+        if (res.ok) {
+            const user = await res.json();
+            updateAuthUI(user);
+        } else {
+            token = null;
+            localStorage.removeItem('token');
+            updateAuthUI(null);
+        }
+    } catch (err) {
+        updateAuthUI(null);
+    }
+}
+
+function updateAuthUI(user) {
+    const userDisplay = document.getElementById('user-display');
+    const authButtons = document.getElementById('auth-buttons');
+    
+    if (user) {
+        currentUser = user;
+        userDisplay.querySelector('.user-name').textContent = user.full_name;
+        userDisplay.style.display = 'flex';
+        authButtons.style.display = 'none';
+        if (window.location.hash === '#login' || window.location.hash === '#signup' || !window.location.hash) {
+            showPanel('dashboard');
+        }
+    } else {
+        currentUser = null;
+        userDisplay.style.display = 'none';
+        authButtons.style.display = 'block';
+        if (window.location.hash !== '#signup') {
+            showPanel('login');
+        }
+    }
+    initIcons();
+}
+
+// Logout Handling
+document.getElementById('sidebar-logout')?.addEventListener('click', () => {
+    token = null;
+    localStorage.removeItem('token');
+    updateAuthUI(null);
+});
+
+// Auth Form Submissions
+document.getElementById('loginForm')?.addEventListener('submit', async (e) => {
     e.preventDefault();
     const email = document.getElementById('loginEmail').value;
     const password = document.getElementById('loginPassword').value;
-    const btn = loginForm.querySelector('button');
-    btn.textContent = 'Authenticating...';
+    const msg = document.getElementById('loginMsg');
     
     try {
-        const res = await fetch(`${API_URL}/auth/login`, {
+        const res = await fetch('/api/auth/login', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-            body: `username=${encodeURIComponent(email)}&password=${encodeURIComponent(password)}`
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ email, password })
         });
         const data = await res.json();
         if (res.ok) {
             token = data.access_token;
             localStorage.setItem('token', token);
-            updateDashboardUI();
-            location.hash = '#dashboard';
+            updateAuthUI(data.user);
+            msg.innerHTML = '<span class="tag live">Authenticated</span>';
         } else {
-            document.getElementById('loginMsg').innerHTML = `<span style="color: #ef4444;">${data.detail || 'Login failed.'}</span>`;
+            msg.textContent = data.detail || 'Login failed';
         }
     } catch (err) {
-        document.getElementById('loginMsg').textContent = 'Connection error.';
-    } finally {
-        btn.textContent = 'Sign In';
+        msg.textContent = 'Server connection error';
     }
-};
+});
 
-// Signup
-const signupForm = document.getElementById('signupForm');
-if (signupForm) signupForm.onsubmit = async e => {
+document.getElementById('signupForm')?.addEventListener('submit', async (e) => {
     e.preventDefault();
-    const name = document.getElementById('signupName').value;
+    const full_name = document.getElementById('signupName').value;
     const email = document.getElementById('signupEmail').value;
     const password = document.getElementById('signupPassword').value;
-    const res = await fetch(`${API_URL}/auth/register?name=${encodeURIComponent(name)}&email=${encodeURIComponent(email)}&password=${encodeURIComponent(password)}`, {
-        method: 'POST'
-    });
-    const data = await res.json();
-    if (res.ok) {
-        document.getElementById('signupMsg').innerHTML = `<span style="color: #10b981;">Account created! Redirecting...</span>`;
-        setTimeout(() => location.hash = '#login', 1500);
-    } else {
-        document.getElementById('signupMsg').innerHTML = `<span style="color: #ef4444;">${data.detail || 'Signup failed.'}</span>`;
+    const msg = document.getElementById('signupMsg');
+    
+    try {
+        const res = await fetch('/api/auth/signup', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ email, password, full_name })
+        });
+        const data = await res.json();
+        if (res.ok) {
+            msg.innerHTML = '<span class="tag live">Account Created!</span>';
+            setTimeout(() => showPanel('login'), 2000);
+        } else {
+            msg.textContent = data.detail || 'Registration failed';
+        }
+    } catch (err) {
+        msg.textContent = 'Server connection error';
     }
-};
+});
 
-// Upload Policy
-const uploadForm = document.getElementById('uploadForm');
-if (uploadForm) uploadForm.onsubmit = async e => {
+// Ticket Submission
+document.getElementById('ticketForm')?.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const text = document.getElementById('ticketText').value;
+    const order_json = JSON.parse(document.getElementById('orderJson').value);
+    const msg = document.getElementById('ticketMsg');
+    
+    msg.innerHTML = '<div class="system-status"><div class="status-dot"></div><span>AI Cluster Synchronizing...</span></div>';
+    
+    try {
+        const res = await fetch('/api/ticket/audit', {
+            method: 'POST',
+            headers: { 
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${token}`
+            },
+            body: JSON.stringify({ text, order_json })
+        });
+        const data = await res.json();
+        if (res.ok) {
+            msg.innerHTML = `
+                <div class="card glass" style="margin-top: 1.5rem; border-left: 4px solid var(--primary);">
+                    <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 1rem;">
+                        <span class="tag live">${data.triage_result.category.toUpperCase()}</span>
+                        <span class="tag ${data.resolution.decision.toLowerCase()}">${data.resolution.decision}</span>
+                    </div>
+                    <p style="font-size: 0.95rem; line-height: 1.6;">${data.resolution.explanation}</p>
+                </div>
+            `;
+        } else {
+            msg.textContent = 'Auth Required / Submission failed';
+        }
+    } catch (err) {
+        msg.textContent = 'Agent synchronization error';
+    }
+});
+
+// Knowledge Sync
+document.getElementById('uploadForm')?.addEventListener('submit', async (e) => {
     e.preventDefault();
     const fileInput = document.getElementById('policyFile');
-    const file = fileInput.files[0];
-    const btn = uploadForm.querySelector('button');
-    btn.textContent = 'Syncing Knowledge...';
+    const msg = document.getElementById('uploadMsg');
     
+    if (!fileInput.files[0]) return;
     const formData = new FormData();
-    formData.append('file', file);
+    formData.append('file', fileInput.files[0]);
+    
+    msg.innerHTML = '<span class="status-dot"></span> <span>Optimizing Vector Index...</span>';
+    
     try {
-        const res = await fetch(`${API_URL}/policy/upload`, {
+        const res = await fetch('/api/policy/sync', {
             method: 'POST',
-            headers: { 'Authorization': `Bearer ${token}` },
             body: formData
         });
         const data = await res.json();
         if (res.ok) {
-            document.getElementById('uploadMsg').innerHTML = `<span style="color: #10b981;">${data.msg}</span>`;
+            msg.innerHTML = `<span class="tag live">Sync Complete: ${data.indexed_chunks} Nodes</span>`;
         } else {
-            document.getElementById('uploadMsg').innerHTML = `<span style="color: #ef4444;">${data.detail}</span>`;
+            msg.textContent = 'Sync failed';
         }
     } catch (err) {
-        document.getElementById('uploadMsg').textContent = 'Upload failed.';
-    } finally {
-        btn.textContent = 'Sync Knowledge Base';
+        msg.textContent = 'API Reachability Error';
     }
-};
+});
 
-// Submit Ticket
-const ticketForm = document.getElementById('ticketForm');
-if (ticketForm) ticketForm.onsubmit = async e => {
-    e.preventDefault();
-    const ticketText = document.getElementById('ticketText').value;
-    const orderJson = document.getElementById('orderJson').value;
-    const btn = ticketForm.querySelector('button');
-    btn.textContent = 'Agent Pipeline Running...';
-    
-    try {
-        const res = await fetch(`${API_URL}/ticket/submit?ticket_text=${encodeURIComponent(ticketText)}&order_json=${encodeURIComponent(orderJson)}`, {
-            method: 'POST',
-            headers: { 'Authorization': `Bearer ${token}` }
-        });
-        const data = await res.json();
-        const msgDiv = document.getElementById('ticketMsg');
-        msgDiv.innerHTML = `
-            <div class="response-card" style="margin-top: 2rem;">
-                <span class="tag ${data.decision}">${data.decision}</span>
-                <p style="font-weight: 600; margin-bottom: 0.5rem;">AI Response:</p>
-                <p style="color: var(--text-main); line-height: 1.6;">${data.customer_response}</p>
-                <div style="margin-top: 1rem; padding-top: 1rem; border-top: 1px solid var(--glass-border);">
-                    <p style="font-size: 0.8rem; color: var(--text-muted);"><strong>Rationale:</strong> ${data.rationale}</p>
-                </div>
-            </div>
-        `;
-    } catch (err) {
-        document.getElementById('ticketMsg').textContent = 'Error processing ticket.';
-    } finally {
-        btn.textContent = 'Run Resolution Pipeline';
-    }
-};
+// Drop Zone Interaction
+const dropZone = document.getElementById('dropZone');
+const fileInput = document.getElementById('policyFile');
 
-// Load Responses
-const loadResponsesBtn = document.getElementById('loadResponses');
-if (loadResponsesBtn) loadResponsesBtn.onclick = async () => {
-    const content = document.getElementById('responsesContent');
-    content.innerHTML = '<p>Loading history...</p>';
-    try {
-        const res = await fetch(`${API_URL}/ticket/responses`, {
-            headers: { 'Authorization': `Bearer ${token}` }
-        });
-        const data = await res.json();
-        if (data.length === 0) {
-            content.innerHTML = '<p style="color: var(--text-muted);">No resolutions found.</p>';
-            return;
-        }
-        content.innerHTML = data.map(r => `
-            <div class="response-card">
-                <div style="display: flex; justify-content: space-between; align-items: flex-start;">
-                    <span class="tag ${r.decision}">${r.decision}</span>
-                    <span style="font-size: 0.7rem; color: var(--text-muted);">${new Date(r.created_at).toLocaleString()}</span>
-                </div>
-                <p style="margin: 1rem 0;">${r.response_text}</p>
-                <p style="font-size: 0.8rem; color: var(--text-muted);"><strong>Category:</strong> ${r.classification}</p>
-            </div>
-        `).join('');
-    } catch (err) {
-        content.innerHTML = 'Failed to load responses.';
-    }
-};
+if (dropZone && fileInput) {
+    dropZone.addEventListener('click', () => fileInput.click());
+    dropZone.addEventListener('dragover', (e) => {
+        e.preventDefault();
+        dropZone.style.borderColor = 'var(--primary)';
+    });
+    dropZone.addEventListener('dragleave', () => dropZone.style.borderColor = 'var(--glass-border)');
+    dropZone.addEventListener('drop', (e) => {
+        e.preventDefault();
+        fileInput.files = e.dataTransfer.files;
+        dropZone.innerHTML = `<i data-lucide="file-check"></i><h3>${e.dataTransfer.files[0].name}</h3><p>Ready for AI indexing</p>`;
+        initIcons();
+    });
+}
 
-// Run Evaluation
-const runEvalBtn = document.getElementById('runEvaluation');
-if (runEvalBtn) runEvalBtn.onclick = async () => {
-    const btn = runEvalBtn;
-    const statsDiv = document.getElementById('evaluationMetrics');
+// Evaluation Engine
+document.getElementById('runEvaluation')?.addEventListener('click', async () => {
+    const btn = document.getElementById('runEvaluation');
     const content = document.getElementById('evaluationContent');
+    const metrics = document.getElementById('evaluationMetrics');
     
-    btn.textContent = 'Running 20+ Test Audit...';
     btn.disabled = true;
-    statsDiv.style.display = 'none';
-    content.innerHTML = '<p>Processing evaluation cases, please wait...</p>';
+    btn.innerHTML = '<i data-lucide="loader" class="spin"></i> Running Baseline...';
+    initIcons();
 
     try {
-        const res = await fetch(`${API_URL}/evaluation/report`, {
-            headers: { 'Authorization': `Bearer ${token}` }
-        });
+        const res = await fetch('/api/evaluation/run', { method: 'POST' });
         const data = await res.json();
         
-        // Show Metrics
-        statsDiv.style.display = 'grid';
-        document.getElementById('metricCorrectness').textContent = data.correctness;
-        document.getElementById('metricCoverage').textContent = data.citation_coverage;
-        document.getElementById('metricEscalation').textContent = data.escalation_accuracy;
-
-        // Show Details
-        content.innerHTML = data.details.map(item => `
-            <div class="response-card" style="border-left: 4px solid ${item.correct ? '#10b981' : '#ef4444'};">
-                <p style="font-size: 0.8rem; font-weight: 700; opacity: 0.7;">Case # ${item.input.ticket_text.substring(0, 30)}...</p>
-                <div style="display: flex; gap: 1rem; margin-top: 0.5rem;">
-                    <div style="flex: 1;">
-                        <span style="font-size: 0.7rem; color: var(--text-muted);">EXPECTED</span>
-                        <div style="font-size: 0.8rem; font-weight: 600;">Decision: ${item.input.expected.decision}</div>
-                    </div>
-                    <div style="flex: 1;">
-                        <span style="font-size: 0.7rem; color: var(--text-muted);">ACTUAL</span>
-                        <div style="font-size: 0.8rem; font-weight: 600; color: ${item.correct ? '#10b981' : '#f87171'};">Decision: ${item.output.decision}</div>
-                    </div>
+        metrics.style.display = 'flex';
+        document.getElementById('metricCorrectness').textContent = `${(data.summary.correctness_rate * 100).toFixed(1)}%`;
+        
+        content.innerHTML = data.results.map(r => `
+            <div class="audit-item glass">
+                <div class="audit-meta">
+                    <h4>Case #${r.case_id}</h4>
+                    <p>${r.ticket_text.substring(0, 70)}...</p>
                 </div>
-                ${!item.correct ? `
-                    <div style="margin-top: 0.5rem; padding-top: 0.5rem; border-top: 1px dashed var(--glass-border); font-size: 0.7rem; color: #f87171;">
-                        Mismatch: AI decided to ${item.output.decision} instead of ${item.input.expected.decision}.
-                    </div>
-                ` : ''}
+                <div class="audit-action">
+                    <span class="tag ${r.is_correct ? 'live' : 'deny'}">${r.is_correct ? 'PASSED' : 'FAIL'}</span>
+                </div>
             </div>
         `).join('');
-
     } catch (err) {
-        content.innerHTML = 'Evaluation failed. Make sure your backend with the 20 test cases is running.';
+        content.innerHTML = '<p>Engine connection timeout.</p>';
     } finally {
-        btn.textContent = 'Run 20+ Case Audit';
         btn.disabled = false;
+        btn.innerHTML = '<i data-lucide="gauge"></i> Start Baseline Audit';
+        initIcons();
     }
-};
+});
+
+// Initial Load
+document.addEventListener('DOMContentLoaded', () => {
+    initIcons();
+    const hash = window.location.hash.substring(1) || 'dashboard';
+    showPanel(hash);
+    validateToken();
+});
+
+window.addEventListener('hashchange', () => {
+    const hash = window.location.hash.substring(1) || 'dashboard';
+    showPanel(hash);
+});
