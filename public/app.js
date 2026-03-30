@@ -176,17 +176,34 @@ document.getElementById('ticketForm')?.addEventListener('submit', async (e) => {
     }
 });
 
-// Knowledge Sync
+// Knowledge Sync (Hardened for Production)
 document.getElementById('uploadForm')?.addEventListener('submit', async (e) => {
     e.preventDefault();
     const fileInput = document.getElementById('policyFile');
     const msg = document.getElementById('uploadMsg');
     
-    if (!fileInput.files[0]) return;
+    // Safety check for DOM elements
+    if (!fileInput || !msg) {
+        console.error("DOM Sync Failure: Required upload elements missing.");
+        return;
+    }
+
+    if (!token) {
+        msg.innerHTML = '<span class="tag deny">Login Required for Sync</span>';
+        setTimeout(() => showPanel('login'), 1500);
+        return;
+    }
+
+    if (!fileInput.files || fileInput.files.length === 0) {
+        msg.innerHTML = '<span class="tag orange">Select a Knowledge Source first</span>';
+        return;
+    }
+
+    const file = fileInput.files[0];
     const formData = new FormData();
-    formData.append('file', fileInput.files[0]);
+    formData.append('file', file);
     
-    msg.innerHTML = '<span class="status-dot"></span> <span>Optimizing Vector Index...</span>';
+    msg.innerHTML = '<div class="system-status"><div class="status-dot"></div><span>Optimizing Vector Index...</span></div>';
     
     try {
         const res = await fetch('/api/policy/sync', {
@@ -196,12 +213,12 @@ document.getElementById('uploadForm')?.addEventListener('submit', async (e) => {
         });
         const data = await res.json();
         if (res.ok) {
-            msg.innerHTML = `<span class="tag live">Sync Complete: ${data.indexed_chunks} Nodes</span>`;
+            msg.innerHTML = `<span class="tag live">Sync Complete: ${data.indexed_chunks || 0} Nodes</span>`;
         } else {
-            msg.textContent = 'Sync failed';
+            msg.innerHTML = `<span class="tag deny">Sync Failed: ${data.detail || 'Access Denied'}</span>`;
         }
     } catch (err) {
-        msg.textContent = 'API Reachability Error';
+        msg.innerHTML = '<span class="tag deny">API Gateway Reachability Error</span>';
     }
 });
 
