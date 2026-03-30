@@ -25,13 +25,17 @@ def evaluation_report(user: User = Depends(get_current_user)):
     citation_coverage = 0
     escalation_accuracy = 0
     for case in evaluation_cases:
-        res = evaluate_case(case, user.id)
-        expected = case["expected"]
-        is_correct = (res["decision"] == expected["decision"]) and (res["classification"] == expected["classification"])
-        correct += int(is_correct)
-        citation_coverage += int(bool(res.get("citations")))
-        escalation_accuracy += int(res["decision"] == "escalate" if expected["decision"] == "escalate" else 1)
-        results.append({"input": case, "output": res, "correct": is_correct})
+        try:
+            res = evaluate_case(case, user.id)
+            expected = case["expected"]
+            is_correct = (res["decision"] == expected["decision"]) and (res["classification"] == expected["classification"])
+            correct += int(is_correct)
+            citation_coverage += int(bool(res.get("citations")))
+            escalation_accuracy += int(res["decision"] == "escalate" if expected["decision"] == "escalate" else 1)
+            results.append({"input": case, "output": res, "correct": is_correct})
+        except Exception as e:
+            print(f"FAILED CASE: {case['ticket_text'][:30]} - Error: {e}")
+            results.append({"input": case, "output": {"decision": "error", "customer_response": str(e)}, "correct": False})
     total = len(evaluation_cases)
     report = {
         "total": total,

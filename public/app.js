@@ -50,6 +50,7 @@ function updateDashboardUI() {
 window.addEventListener('DOMContentLoaded', () => {
     updateDashboardUI();
     showPanel(location.hash);
+    if (window.lucide) lucide.createIcons();
 });
 
 // Login

@@ -13,7 +13,7 @@ router = APIRouter()
 SECRET_KEY = os.getenv("SECRET_KEY", "supersecret")
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 60
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+pwd_context = CryptContext(schemes=["pbkdf2_sha256"], deprecated="auto")
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/auth/login")
 
 def verify_password(plain, hashed):
@@ -30,6 +30,7 @@ def create_access_token(data: dict, expires_delta: timedelta = None):
 
 @router.post("/register")
 def register(name: str, email: str, password: str, db: Session = Depends(get_db)):
+    print(f"REGISTER DEBUG: {name=}, {email=}, password_len={len(password)}")
     if db.query(User).filter(User.email == email).first():
         raise HTTPException(status_code=400, detail="Email already registered")
     user = User(name=name, email=email, password_hash=get_password_hash(password))

@@ -5,8 +5,11 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-# Modified for Vercel/Production resilience
-DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./supportai.db")
+# Updated for Vercel/Production resilience
+if os.getenv("VERCEL"):
+    DATABASE_URL = "sqlite:////tmp/supportai.db"
+else:
+    DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./supportai.db")
 
 # For SQLite, we need connect_args={"check_same_thread": False}
 if DATABASE_URL.startswith("sqlite"):

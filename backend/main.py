@@ -7,10 +7,31 @@ from backend.routes import auth, policy, ticket, evaluation
 from fastapi.staticfiles import StaticFiles
 import os
 
-# Initialize DB synchronously for serverless compatibility
-init_db()
+# Database initialization check
+_db_initialized = False
+
+def ensure_db():
+    global _db_initialized
+    if not _db_initialized:
+        init_db()
+        _db_initialized = True
+
+# Initial check for Vercel
+if os.getenv("VERCEL"):
+    ensure_db()
+else:
+    init_db()
 
 app = FastAPI(title="SupportAI SaaS")
+
+# CORS Middleware
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 # Routers (prefixed with /api for Consistency)
 app.include_router(auth.router, prefix="/api/auth", tags=["auth"])

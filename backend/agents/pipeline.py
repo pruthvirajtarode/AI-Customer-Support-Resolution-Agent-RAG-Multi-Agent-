@@ -20,7 +20,7 @@ def process_ticket(ticket, user_id):
         }
     retrieved = retriever_agent(ticket.ticket_text, vectordb)
     # 3. Resolution
-    resolution = resolution_agent(ticket.ticket_text, retrieved)
+    resolution = resolution_agent(ticket.ticket_text, retrieved, ticket.order_json, initial_triage=triage)
     # 4. Compliance
     compliance = compliance_agent(resolution, retrieved)
     if not compliance["valid"]:
