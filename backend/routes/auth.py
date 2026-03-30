@@ -62,6 +62,10 @@ def login(data: LoginRequest, db: Session = Depends(get_db)):
         "user": {"email": user.email, "full_name": user.name}
     }
 
+@router.get("/me")
+def get_me(user: User = Depends(get_current_user)):
+    return {"email": user.email, "full_name": user.name}
+
 # Dependency for protected routes
 def get_current_user(token: str = Depends(oauth2_scheme), db: Session = Depends(get_db)):
     try:
