@@ -39,7 +39,6 @@ app.include_router(policy.router, prefix="/api/policy", tags=["policy"])
 app.include_router(ticket.router, prefix="/api/ticket", tags=["ticket"])
 app.include_router(evaluation.router, prefix="/api/evaluation", tags=["evaluation"])
 
-@app.get("/")
 @app.get("/api")
 def root():
     return {"message": "SupportAI SaaS is running."}
