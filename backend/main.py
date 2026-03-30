@@ -39,8 +39,17 @@ app.include_router(policy.router, prefix="/api/policy", tags=["policy"])
 app.include_router(ticket.router, prefix="/api/ticket", tags=["ticket"])
 app.include_router(evaluation.router, prefix="/api/evaluation", tags=["evaluation"])
 
+from fastapi.responses import FileResponse, JSONResponse
+
+@app.get("/")
+def serve_ui():
+    index_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "public", "index.html")
+    if os.path.exists(index_path):
+        return FileResponse(index_path)
+    return JSONResponse(content={"detail": "UI files not found. Check public directory."}, status_code=404)
+
 @app.get("/api")
-def root():
+def api_root():
     return {"message": "SupportAI SaaS is running."}
 
 # Serve public static files at root
