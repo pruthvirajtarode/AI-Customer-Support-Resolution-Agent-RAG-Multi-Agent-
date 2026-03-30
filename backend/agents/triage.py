@@ -26,6 +26,7 @@ def triage_agent(ticket_text):
                     break
             return {
                 "classification": classification,
+                "category": classification,
                 "missing_info": ["order_id"] if "order" not in ticket_text.lower() else [],
                 "clarifying_questions": [f"Could you provide more context?"]
             }
@@ -46,6 +47,7 @@ def triage_agent(ticket_text):
         missing.append("date")
     return {
         "classification": classification,
+        "category": classification,
         "missing_info": missing,
         "clarifying_questions": [f"Please provide {m}." for m in missing[:3]]
     }

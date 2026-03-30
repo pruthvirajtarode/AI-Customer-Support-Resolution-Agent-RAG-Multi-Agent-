@@ -1,16 +1,14 @@
 import os
 import tempfile
-from langchain_text_splitters import RecursiveCharacterTextSplitter
 try:
-    from langchain_openai import OpenAIEmbeddings
-    from langchain_huggingface import HuggingFaceEmbeddings
+    from langchain_text_splitters import RecursiveCharacterTextSplitter
 except ImportError:
-    from langchain_community.embeddings import OpenAIEmbeddings, HuggingFaceEmbeddings
-try:
-    from langchain_community.vectorstores import FAISS
-except ImportError:
-    FAISS = None
+    class RecursiveCharacterTextSplitter:
+        def __init__(self, chunk_size, chunk_overlap): self.cs = chunk_size
+        def split_text(self, text): return [text[i:i+self.cs] for i in range(0, len(text), self.cs-100)]
+
 import pickle
+VECTOR_DB_PATH = os.path.join(tempfile.gettempdir(), "faiss_index")
 
 VECTOR_DB_PATH = os.path.join(tempfile.gettempdir(), "faiss_index")
 os.makedirs(VECTOR_DB_PATH, exist_ok=True)
