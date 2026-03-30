@@ -26,4 +26,9 @@ def process_ticket(ticket, user_id):
     if not compliance["valid"]:
         resolution["decision"] = "escalate"
         resolution["customer_response"] = "Escalated to human agent."
-    return resolution
+    return {
+        "triage_result": triage,
+        "resolution": resolution,
+        "classification": triage["category"],
+        "decision": resolution["decision"]
+    }

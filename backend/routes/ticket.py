@@ -9,9 +9,15 @@ import json
 
 router = APIRouter()
 
-@router.post("/submit")
-def submit_ticket(ticket_text: str, order_json: str, db: Session = Depends(get_db), user=Depends(get_current_user)):
-    ticket = Ticket(user_id=user.id, ticket_text=ticket_text, order_json=order_json)
+from pydantic import BaseModel
+
+class TicketRequest(BaseModel):
+    text: str
+    order_json: dict
+
+@router.post("/audit")
+def audit_ticket(data: TicketRequest, db: Session = Depends(get_db), user=Depends(get_current_user)):
+    ticket = Ticket(user_id=user.id, ticket_text=data.text, order_json=json.dumps(data.order_json))
     db.add(ticket)
     db.commit()
     db.refresh(ticket)
