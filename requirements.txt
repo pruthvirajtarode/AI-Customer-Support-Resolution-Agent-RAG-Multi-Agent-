@@ -9,8 +9,6 @@ python-multipart
 langchain
 langchain-openai
 langchain-community
-langchain-huggingface
-faiss-cpu
 openai
 PyPDF2
 requests

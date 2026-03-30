@@ -12,36 +12,44 @@ except ImportError:
     FAISS = None
 import pickle
 
-EMBEDDING_MODEL = os.getenv("EMBEDDING_MODEL", "openai")
-
 VECTOR_DB_PATH = os.path.join(tempfile.gettempdir(), "faiss_index")
 os.makedirs(VECTOR_DB_PATH, exist_ok=True)
 
-def get_embeddings():
-    if EMBEDDING_MODEL == "openai" or not EMBEDDING_MODEL:
-        return OpenAIEmbeddings()
-    else:
-        return HuggingFaceEmbeddings(model_name="all-MiniLM-L6-v2")
+# Simplified VectorDB for Serverless Compatibility
+class SimpleSimilarity:
+    def __init__(self, texts, metadatas):
+        self.texts = texts
+        self.metadatas = metadatas
+    def similarity_search(self, query, k=3):
+        results = []
+        q_words = query.lower().split()
+        for i, text in enumerate(self.texts):
+            score = sum(3 for w in q_words if w in text.lower())
+            results.append((score, text, self.metadatas[i]))
+        # Sort and return top k
+        results.sort(key=lambda x: x[0], reverse=True)
+        from langchain.schema import Document
+        return [Document(page_content=r[1], metadata=r[2]) for r in results[:k]]
 
 def process_policy_document(doc, user_id):
     text = doc.content
     splitter = RecursiveCharacterTextSplitter(chunk_size=800, chunk_overlap=100)
     chunks = splitter.split_text(text)
     metadatas = [{"doc_id": doc.id, "user_id": user_id, "chunk_id": i, "filename": doc.filename} for i in range(len(chunks))]
-    if FAISS is None:
-        print("FAISS is not installed or failed to load. Skipping index saving.")
-        return
-    embeddings = get_embeddings()
-    vectordb = FAISS.from_texts(chunks, embeddings, metadatas=metadatas)
-    # Save index per user
-    vectordb.save_local(os.path.join(VECTOR_DB_PATH, f"faiss_{user_id}"))
+    
+    index_name = f"simple_index_{user_id}.pkl"
+    index_path = os.path.join(VECTOR_DB_PATH, index_name)
+    with open(index_path, "wb") as f:
+        pickle.dump({"chunks": chunks, "metadatas": metadatas}, f)
 
 def load_user_faiss(user_id):
-    if FAISS is None:
-        print("FAISS is not installed or failed to load. Skipping index retrieval.")
-        return None
-    embeddings = get_embeddings()
-    index_path = os.path.join(VECTOR_DB_PATH, f"faiss_{user_id}")
+    index_name = f"simple_index_{user_id}.pkl"
+    index_path = os.path.join(VECTOR_DB_PATH, index_name)
     if not os.path.exists(index_path):
         return None
-    return FAISS.load_local(index_path, embeddings, allow_dangerous_deserialization=True)
+    try:
+        with open(index_path, "rb") as f:
+            data = pickle.load(f)
+        return SimpleSimilarity(data["chunks"], data["metadatas"])
+    except Exception:
+        return None
