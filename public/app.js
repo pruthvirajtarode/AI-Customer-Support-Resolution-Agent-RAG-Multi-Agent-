@@ -191,6 +191,7 @@ document.getElementById('uploadForm')?.addEventListener('submit', async (e) => {
     try {
         const res = await fetch('/api/policy/sync', {
             method: 'POST',
+            headers: { 'Authorization': `Bearer ${token}` },
             body: formData
         });
         const data = await res.json();

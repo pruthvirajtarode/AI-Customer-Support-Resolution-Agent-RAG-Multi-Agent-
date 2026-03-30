@@ -8,7 +8,7 @@ import os
 
 router = APIRouter()
 
-@router.post("/upload")
+@router.post("/sync")
 def upload_policy(file: UploadFile = File(...), db: Session = Depends(get_db), user=Depends(get_current_user)):
     if not file.filename.endswith((".txt", ".pdf")):
         raise HTTPException(status_code=400, detail="Only txt/pdf allowed")
