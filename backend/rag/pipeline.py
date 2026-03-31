@@ -41,11 +41,27 @@ def process_policy_document(doc, user_id):
         pickle.dump({"chunks": chunks, "metadatas": metadatas}, f)
     return len(chunks)
 
-def load_user_faiss(user_id):
+def load_user_faiss(user_id, db=None):
     index_name = f"simple_index_{user_id}.pkl"
     index_path = os.path.join(VECTOR_DB_PATH, index_name)
+    
     if not os.path.exists(index_path):
-        return None
+        if db:
+            from backend.models.policy_document import PolicyDocument
+            docs = db.query(PolicyDocument).filter(PolicyDocument.user_id == user_id).all()
+            if not docs:
+                return None
+            # Rebuild index
+            full_text = "\n\n".join([d.content for d in docs])
+            splitter = RecursiveCharacterTextSplitter(chunk_size=800, chunk_overlap=100)
+            chunks = splitter.split_text(full_text)
+            metadatas = [{"user_id": user_id, "chunk_id": i, "filename": "Legacy Context"} for i in range(len(chunks))]
+            
+            with open(index_path, "wb") as f:
+                pickle.dump({"chunks": chunks, "metadatas": metadatas}, f)
+        else:
+            return None
+
     try:
         with open(index_path, "rb") as f:
             data = pickle.load(f)

@@ -69,6 +69,8 @@ function updateAuthUI(user) {
         if (window.location.hash === '#login' || window.location.hash === '#signup' || !window.location.hash) {
             showPanel('dashboard');
         }
+        loadDashboardStats();
+        loadAuditLogs();
     } else {
         currentUser = null;
         userDisplay.style.display = 'none';
@@ -94,17 +96,22 @@ document.getElementById('loginForm')?.addEventListener('submit', async (e) => {
     const password = document.getElementById('loginPassword').value;
     const msg = document.getElementById('loginMsg');
     
+    const formData = new URLSearchParams();
+    formData.append('username', email); // OAuth2 expects 'username'
+    formData.append('password', password);
+
     try {
         const res = await fetch('/api/auth/login', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ email, password })
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+            body: formData
         });
         const data = await res.json();
         if (res.ok) {
             token = data.access_token;
             localStorage.setItem('token', token);
-            updateAuthUI(data.user);
+            // Recover user info since the route doesn't return it directly now
+            await validateToken();
             msg.innerHTML = '<span class="tag live">Authenticated</span>';
         } else {
             msg.textContent = data.detail || 'Login failed';
@@ -143,8 +150,16 @@ document.getElementById('signupForm')?.addEventListener('submit', async (e) => {
 document.getElementById('ticketForm')?.addEventListener('submit', async (e) => {
     e.preventDefault();
     const text = document.getElementById('ticketText').value;
-    const order_json = JSON.parse(document.getElementById('orderJson').value);
+    const orderJsonInput = document.getElementById('orderJson').value;
     const msg = document.getElementById('ticketMsg');
+    
+    let order_json;
+    try {
+        order_json = JSON.parse(orderJsonInput);
+    } catch (e) {
+        msg.textContent = 'Invalid Order Metadata JSON structure';
+        return;
+    }
     
     msg.innerHTML = '<div class="system-status"><div class="status-dot"></div><span>AI Cluster Synchronizing...</span></div>';
     
@@ -168,6 +183,8 @@ document.getElementById('ticketForm')?.addEventListener('submit', async (e) => {
                     <p style="font-size: 0.95rem; line-height: 1.6;">${data.resolution.explanation}</p>
                 </div>
             `;
+            // Refresh Log
+            loadAuditLogs();
         } else {
             msg.textContent = 'Auth Required / Submission failed';
         }
@@ -175,6 +192,67 @@ document.getElementById('ticketForm')?.addEventListener('submit', async (e) => {
         msg.textContent = 'Agent synchronization error';
     }
 });
+
+async function loadDashboardStats() {
+    if (!token) return;
+    try {
+        const res = await fetch('/api/ticket/stats', {
+            headers: { 'Authorization': `Bearer ${token}` }
+        });
+        const data = await res.json();
+        if (res.ok) {
+            const statCards = document.querySelectorAll('.stat-card');
+            if (statCards.length >= 3) {
+                statCards[0].querySelector('.value').textContent = data.total_audits.toLocaleString();
+                statCards[1].querySelector('.value').textContent = data.compliance_rate;
+                statCards[2].querySelector('.value').textContent = data.avg_latency;
+            }
+
+            // Render Activity Chart
+            const chart = document.getElementById('activityIndicator');
+            if (chart && data.activity) {
+                const max = Math.max(...data.activity.map(a => a.count)) || 1;
+                chart.innerHTML = `<div class="bars">${data.activity.map(a => `
+                    <div class="bar" style="height: ${Math.max(5, (a.count / max) * 100)}%;">
+                        <span class="bar-label">${a.day}</span>
+                    </div>`).join('')}</div>`;
+            }
+        }
+    } catch (err) {
+        console.error('Stats sync error');
+    }
+}
+
+async function loadAuditLogs() {
+    const container = document.getElementById('responsesContent');
+    if (!container) return;
+
+    try {
+        const res = await fetch('/api/ticket/history', {
+            headers: { 'Authorization': `Bearer ${token}` }
+        });
+        const data = await res.json();
+        if (res.ok && data.length > 0) {
+            container.innerHTML = data.map(item => `
+                <div class="audit-item glass">
+                    <div class="audit-meta">
+                        <span class="tag live">${item.category.toUpperCase()}</span>
+                        <p>${item.ticket_text.substring(0, 50)}...</p>
+                    </div>
+                    <div class="audit-action">
+                        <span class="tag ${item.decision.toLowerCase()}">${item.decision}</span>
+                    </div>
+                </div>
+            `).join('');
+        } else {
+            container.innerHTML = '<p class="placeholder-empty">No resolution logs found.</p>';
+        }
+    } catch (err) {
+        container.innerHTML = '<p>History sync error.</p>';
+    }
+}
+
+document.getElementById('loadResponses')?.addEventListener('click', loadAuditLogs);
 
 // Knowledge Sync (Hardened for Production)
 document.getElementById('uploadForm')?.addEventListener('submit', async (e) => {
@@ -253,7 +331,12 @@ document.getElementById('runEvaluation')?.addEventListener('click', async () => 
     initIcons();
 
     try {
-        const res = await fetch('/api/evaluation/run', { method: 'POST' });
+        const res = await fetch('/api/evaluation/run', { 
+            method: 'POST',
+            headers: { 'Authorization': `Bearer ${token}` }
+        });
+        if (!res.ok) throw new Error('Unauthorized or Server Error');
+        
         const data = await res.json();
         
         metrics.style.display = 'flex';
@@ -263,7 +346,8 @@ document.getElementById('runEvaluation')?.addEventListener('click', async () => 
             <div class="audit-item glass">
                 <div class="audit-meta">
                     <h4>Case #${r.case_id}</h4>
-                    <p>${r.ticket_text.substring(0, 70)}...</p>
+                    <p style="font-size: 0.85rem; color: var(--text-dim);">${r.ticket_text.substring(0, 100)}...</p>
+                    <div style="margin-top: 0.5rem; font-size: 0.8rem; color: var(--primary);">Expected: ${r.expected.decision} | Result: ${r.result.decision}</div>
                 </div>
                 <div class="audit-action">
                     <span class="tag ${r.is_correct ? 'live' : 'deny'}">${r.is_correct ? 'PASSED' : 'FAIL'}</span>

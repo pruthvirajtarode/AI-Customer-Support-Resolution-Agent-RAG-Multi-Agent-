@@ -102,7 +102,8 @@ if menu == "Signup":
         password = st.text_input("Secure Password", type="password")
         if st.button("Initialize Agent Account"):
             try:
-                r = requests.post(f"{API_URL}/auth/register", params={"name": name, "email": email, "password": password})
+                # Backend expects /api/auth/signup with JSON body
+                r = requests.post(f"{API_URL}/auth/signup", json={"email": email, "password": password, "full_name": name})
                 if r.status_code == 200:
                     st.success("✅ Account initialized! Please login.")
                 else:
@@ -117,6 +118,7 @@ elif menu == "Login":
         password = st.text_input("Password", type="password")
         if st.button("Authenticate"):
             try:
+                # OAuth2 expects 'username' and 'password' as form data
                 data = {"username": email, "password": password}
                 r = requests.post(f"{API_URL}/auth/login", data=data)
                 if r.status_code == 200:
@@ -130,21 +132,25 @@ elif menu == "Login":
                 st.error("Backend offline.")
 
 elif menu == "Dashboard":
-    col1, col2, col3 = st.columns(3)
-    col1.metric("Resolution Time", "1.2s", "-0.4s")
-    col2.metric("Compliance Rate", "99.8%", "0.2%")
-    col3.metric("Auto-Escalation", "12%", "-2%")
-    
-    st.markdown("### 📈 Recent Activity")
-    st.info("System operational. All agents (Triage, Retriever, Resolution, Compliance) are live.")
-    
-    with st.expander("Agent Status Details"):
-        st.json({
-            "TriageAgent": "Optimized",
-            "RetrieverAgent": "Connected (FAISS)",
-            "ResolutionAgent": "GPT-4o Ready",
-            "ComplianceAgent": "Enforced"
-        })
+    try:
+        r = requests.get(f"{API_URL}/ticket/stats", headers=get_headers())
+        if r.ok:
+            data = r.json()
+            col1, col2, col3 = st.columns(3)
+            col1.metric("Total Audits", data['total_audits'])
+            col2.metric("Compliance Rate", data['compliance_rate'])
+            col3.metric("Avg Latency", data['avg_latency'])
+            
+            st.markdown("### 📈 Recent Activity")
+            # Render chart from activity data
+            if 'activity' in data:
+                import pandas as pd
+                df = pd.DataFrame(data['activity'])
+                st.bar_chart(df.set_index('day'))
+        else:
+            st.warning("Could not sync dashboard metrics.")
+    except Exception:
+        st.error("Stats service error.")
 
 elif menu == "Knowledge Base":
     st.markdown("### Documents")
@@ -153,9 +159,11 @@ elif menu == "Knowledge Base":
     if uploaded:
         if st.button("Sync to Vector DB"):
             files = {"file": (uploaded.name, uploaded, uploaded.type)}
-            r = requests.post(f"{API_URL}/policy/upload", files=files, headers=get_headers())
+            # Backend expects /api/policy/sync
+            r = requests.post(f"{API_URL}/policy/sync", files=files, headers=get_headers())
             if r.ok:
-                st.success("✅ Knowledge base synchronized!")
+                res = r.json()
+                st.success(f"✅ Knowledge base synchronized! Index: {res.get('indexed_chunks', 0)} nodes.")
             else:
                 st.error("Sync failed.")
 
@@ -166,49 +174,61 @@ elif menu == "Audit Agent":
         ticket_text = st.text_area("Customer Ticket", height=200, placeholder="Type customer request here...")
     with col2:
         st.markdown("### Order Context")
-        order_json = st.text_area("JSON Context", height=200, value='{\n  "order_id": "12345",\n  "status": "delivered",\n  "item": "Electronics",\n  "delivery_date": "2024-03-20"\n}')
+        order_json_input = st.text_area("JSON Context", height=200, value='{\n  "order_id": "ORD-12345",\n  "status": "delivered",\n  "category": "electronics"\n}')
     
     if st.button("Run Resolution Pipeline"):
         if not ticket_text:
             st.warning("Please enter ticket text.")
         else:
+            try:
+                order_json = json.loads(order_json_input)
+            except json.JSONDecodeError:
+                st.error("Invalid JSON in Order Context")
+                st.stop()
+
             with st.spinner("🤖 Multi-agent consensus in progress..."):
                 try:
-                    r = requests.post(f"{API_URL}/ticket/submit", params={"ticket_text": ticket_text, "order_json": order_json}, headers=get_headers())
+                    # Backend expects /api/ticket/audit with JSON body
+                    r = requests.post(f"{API_URL}/ticket/audit", json={"text": ticket_text, "order_json": order_json}, headers=get_headers())
                     if r.ok:
                         res = r.json()
                         st.divider()
-                        status_color = {"approve": "green", "deny": "red", "escalate": "orange"}.get(res['decision'], "blue")
-                        st.markdown(f"### Decision: :{status_color}[{res['decision'].upper()}]")
-                        st.markdown(f"**Classification:** `{res['classification']}`")
+                        decision = res['resolution']['decision']
+                        status_color = {"approve": "green", "deny": "red", "escalate": "orange"}.get(decision.lower(), "blue")
+                        st.markdown(f"### Decision: :{status_color}[{decision.upper()}]")
+                        st.markdown(f"**Classification:** `{res['triage_result']['category']}`")
                         
                         st.markdown("#### 💬 AI Generated Response")
-                        st.info(res['customer_response'])
+                        st.info(res['resolution']['explanation'])
                         
                         with st.expander("🔍 Internal Agent Rationale"):
-                            st.write(res['rationale'])
+                            st.write(res.get('rationale', 'Rationale in explanation.'))
                             if res.get('citations'):
                                 st.markdown("**Citations:**")
                                 st.write(res['citations'])
                     else:
-                        st.error("Pipeline failed.")
+                        st.error(f"Pipeline failed: {r.status_code}")
                 except Exception as e:
                     st.error(f"Error: {e}")
 
 elif menu == "History":
     st.markdown("### Resolution Log")
-    r = requests.get(f"{API_URL}/ticket/responses", headers=get_headers())
+    r = requests.get(f"{API_URL}/ticket/history", headers=get_headers())
     if r.ok:
         data = r.json()
         if not data:
             st.write("No history found.")
-        for item in reversed(data):
+        for item in data:
             with st.container():
                 c1, c2 = st.columns([1, 4])
-                c1.markdown(f"**{item['decision'].upper()}**")
+                decision = item['decision']
+                status_color = ":green" if decision.lower() == "approve" else ":red" if decision.lower() == "deny" else ":orange"
+                c1.markdown(f"**{status_color}[{decision.upper()}]**")
                 c2.write(item['response_text'])
-                st.caption(f"Time: {item.get('created_at', 'N/A')} | Mode: Multi-Agent RAG")
+                st.caption(f"Category: {item['category']} | Mode: Multi-Agent RAG")
                 st.divider()
+    else:
+        st.error("History sync error.")
 
 elif menu == "System Evaluation":
     st.markdown("### ⚖️ Performance Audit")
@@ -216,23 +236,22 @@ elif menu == "System Evaluation":
     
     if st.button("Execute Full 20+ Case Audit"):
         with st.spinner("Running 20+ scenario simulation..."):
-            r = requests.get(f"{API_URL}/evaluation/report", headers=get_headers())
+            # Backend expects /api/evaluation/run
+            r = requests.post(f"{API_URL}/evaluation/run", headers=get_headers())
             if r.ok:
                 data = r.json()
-                m1, m2, m3 = st.columns(3)
-                m1.metric("Overall Accuracy", data['correctness'])
-                m2.metric("Citation Coverage", data['citation_coverage'])
-                m3.metric("Escalation Integrity", data['escalation_accuracy'])
+                m1, m2 = st.columns(2)
+                m1.metric("Overall Accuracy", f"{data['summary']['correctness_rate'] * 100:.1f}%")
+                m2.metric("Total Cases", data['summary']['total_cases'])
                 
                 st.divider()
-                for i, item in enumerate(data['details']):
-                    color = "green" if item['correct'] else "red"
-                    with st.expander(f"Case #{i+1}: {item['input']['ticket_text'][:50]}... - Status: :{color}[{'PASS' if item['correct'] else 'FAIL'}]"):
-                        st.markdown(f"**Ticket:** {item['input']['ticket_text']}")
-                        st.markdown(f"**Order:** `{item['input']['order_json']}`")
-                        st.markdown(f"**Expected Decision:** `{item['input']['expected']['decision']}`")
-                        st.markdown(f"**Actual Decision:** `{item['output']['decision']}`")
-                        if not item['correct']:
-                            st.error(f"Discrepancy: AI resolved as {item['output']['decision']} but expected {item['input']['expected']['decision']}.")
+                for i, item in enumerate(data['results']):
+                    color = "green" if item['is_correct'] else "red"
+                    with st.expander(f"Case #{item['case_id']}: {item['ticket_text'][:50]}... - Status: :{color}[{'PASS' if item['is_correct'] else 'FAIL'}]"):
+                        st.markdown(f"**Ticket:** {item['ticket_text']}")
+                        st.markdown(f"**Result Decision:** `{item['result']['decision']}`")
+                        st.markdown(f"**Expected Decision:** `{item['expected']['decision']}`")
+                        if not item['is_correct']:
+                            st.error(f"Discrepancy: AI resolved as {item['result']['decision']} but expected {item['expected']['decision']}.")
             else:
                 st.error("Evaluation service unreachable.")

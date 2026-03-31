@@ -132,7 +132,7 @@ streamlit run frontend/app.py
 
 ## 👨‍💻 Authors & Credits
 
-- [Your Name](https://github.com/pruthvirajtarode)
+- [Pruthviraj Tarode](https://github.com/pruthvirajtarode)
 - Powered by FastAPI, Streamlit, LangChain, FAISS, OpenAI/HuggingFace
 
 ---

@@ -1,8 +1,8 @@
 fastapi>=0.135.2
 uvicorn
 sqlalchemy
-python-jose[cryptography]
-passlib[bcrypt]
+PyJWT
+passlib
 pydantic>=2.12.5
 pydantic-settings>=2.13.1
 python-multipart
@@ -14,3 +14,4 @@ PyPDF2
 requests
 python-dotenv
 pysqlite3-binary
+email-validator
