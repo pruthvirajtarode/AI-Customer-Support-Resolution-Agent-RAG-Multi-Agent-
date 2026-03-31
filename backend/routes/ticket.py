@@ -17,26 +17,31 @@ class TicketRequest(BaseModel):
 
 @router.post("/audit")
 def audit_ticket(data: TicketRequest, db: Session = Depends(get_db), user=Depends(get_current_user)):
-    ticket = Ticket(user_id=user.id, ticket_text=data.text, order_json=json.dumps(data.order_json))
-    db.add(ticket)
-    db.commit()
-    db.refresh(ticket)
-    
-    # AI pipeline
-    ai_result = process_ticket(ticket, user.id, db=db)
-    
-    # Map agent results to AIResponse model
-    ai_response = AIResponse(
-        ticket_id=ticket.id,
-        classification=ai_result.get("classification", "other"),
-        decision=ai_result.get("decision", "escalate"),
-        rationale=ai_result.get("rationale", ""),
-        response_text=ai_result.get("customer_response", ""),
-        citations=json.dumps(ai_result.get("citations", []))
-    )
-    db.add(ai_response)
-    db.commit()
-    return ai_result
+    try:
+        ticket = Ticket(user_id=user.id, ticket_text=data.text, order_json=json.dumps(data.order_json))
+        db.add(ticket)
+        db.commit()
+        db.refresh(ticket)
+        
+        # AI pipeline
+        ai_result = process_ticket(ticket, user.id, db=db)
+        
+        # Map agent results to AIResponse model
+        ai_response = AIResponse(
+            ticket_id=ticket.id,
+            classification=ai_result.get("classification", "other"),
+            decision=ai_result.get("decision", "escalate"),
+            rationale=ai_result.get("rationale", ""),
+            response_text=ai_result.get("customer_response", ""),
+            citations=json.dumps(ai_result.get("citations", []))
+        )
+        db.add(ai_response)
+        db.commit()
+        return ai_result
+    except Exception as e:
+        import traceback
+        print(f"ERROR: Ticket Audit Failed: {str(e)}\n{traceback.format_exc()}")
+        raise HTTPException(status_code=500, detail=str(e))
 
 @router.get("/list")
 def list_tickets(db: Session = Depends(get_db), user=Depends(get_current_user)):

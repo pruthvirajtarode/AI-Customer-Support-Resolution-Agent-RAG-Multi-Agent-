@@ -17,7 +17,12 @@ def process_ticket(ticket, user_id, db=None):
             "decision": "escalate",
             "rationale": "No policy documents found in knowledge base.",
             "customer_response": "I'm sorry, I don't have access to the company policy dashboard at the moment. Please upload a policy document.",
-            "citations": []
+            "citations": [],
+            "triage_result": {"category": triage.get("category", "other")},
+            "resolution": {
+                "decision": "escalate",
+                "explanation": "No policy documents found in knowledge base. Please upload a policy document in the Knowledge Base tab."
+            }
         }
         
     retrieved = retriever_agent(ticket.ticket_text, vectordb)
