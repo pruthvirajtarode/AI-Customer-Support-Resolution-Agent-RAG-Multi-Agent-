@@ -258,12 +258,12 @@ document.getElementById('loadResponses')?.addEventListener('click', loadAuditLog
 document.getElementById('uploadForm')?.addEventListener('submit', async (e) => {
     e.preventDefault();
     const form = e.currentTarget;
-    const fileInput = form.querySelector('#policyFile');
+    const fileInput = document.getElementById('policyFile');
     const msg = document.getElementById('uploadMsg');
     
     // Safety check for UI elements
     if (!fileInput || !msg) {
-        console.error("Critical: Policy Sync Elements Missing.");
+        console.error("Critical: Policy Sync Elements Missing from DOM.", { fileInput, msg });
         return;
     }
 
