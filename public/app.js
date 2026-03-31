@@ -310,13 +310,30 @@ if (dropZone && fileInput) {
     dropZone.addEventListener('dragover', (e) => {
         e.preventDefault();
         dropZone.style.borderColor = 'var(--primary)';
+        dropZone.style.background = 'rgba(139, 92, 246, 0.1)';
     });
-    dropZone.addEventListener('dragleave', () => dropZone.style.borderColor = 'var(--glass-border)');
+    dropZone.addEventListener('dragleave', () => {
+        dropZone.style.borderColor = 'var(--glass-border)';
+        dropZone.style.background = 'transparent';
+    });
+    
+    const updateDropZoneUI = (file) => {
+        dropZone.innerHTML = `<i data-lucide="file-check"></i><h3>${file.name}</h3><p>Source document ready.</p>`;
+        initIcons();
+    };
+
     dropZone.addEventListener('drop', (e) => {
         e.preventDefault();
-        fileInput.files = e.dataTransfer.files;
-        dropZone.innerHTML = `<i data-lucide="file-check"></i><h3>${e.dataTransfer.files[0].name}</h3><p>Ready for AI indexing</p>`;
-        initIcons();
+        if (e.dataTransfer.files.length > 0) {
+            fileInput.files = e.dataTransfer.files;
+            updateDropZoneUI(e.dataTransfer.files[0]);
+        }
+    });
+
+    fileInput.addEventListener('change', () => {
+        if (fileInput.files.length > 0) {
+            updateDropZoneUI(fileInput.files[0]);
+        }
     });
 }
 
